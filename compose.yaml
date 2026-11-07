@@ -1,0 +1,112 @@
+name: pedidos-viagem
+
+# Configuração repetida nos dois containers PHP (app e queue).
+x-php-comum: &php-comum
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: pedidos-viagem-php:dev
+  working_dir: /var/www/html
+  volumes:
+    - ./:/var/www/html
+    # As dependências (vendor, ~7 mil arquivos) ficam num volume do Docker.
+    # Ler arquivos da pasta do Windows dentro do container é lento; com o
+    # vendor fora dela, cada requisição cai de segundos para milissegundos.
+    - vendor:/var/www/html/vendor
+  restart: unless-stopped
+
+services:
+  # A aplicação Laravel rodando no PHP-FPM.
+  app:
+    <<: *php-comum
+    environment:
+      CONTAINER_ROLE: app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      # O entrypoint cria esse arquivo depois de instalar dependências e rodar as migrations.
+      test: ["CMD", "test", "-f", "/tmp/app-ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  # Worker da fila: é ele quem envia de fato os e-mails de notificação.
+  queue:
+    <<: *php-comum
+    # Não precisa de root para processar fila (menor privilégio possível).
+    user: www-data
+    environment:
+      CONTAINER_ROLE: queue
+    command: ["php", "artisan", "queue:work", "--tries=3", "--backoff=10"]
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # Servidor web: recebe o HTTP na porta 8000 e repassa para o PHP-FPM.
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: viagens_corporativas
+      MYSQL_USER: viagens
+      MYSQL_PASSWORD: segredo
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      # 3307 no Windows para não brigar com um MySQL que já esteja instalado na máquina.
+      - "3307:3306"
+    volumes:
+      - mysql-dados:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # 127.0.0.1 (TCP) e não "localhost" (socket): na primeira subida o MySQL
+      # liga um servidor temporário sem rede, e o ping via socket diria
+      # "pronto" antes da hora.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # SMTP de mentira: guarda os e-mails para você ver em http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
+  # Front-end Vue (extra, não pedido no desafio) em http://localhost:5173
+  # O Vite repassa as chamadas /api para o nginx, então não há problema de CORS.
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      API_URL: http://nginx
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # node_modules fica num volume do Docker, e não na pasta do Windows:
+      # é bem mais rápido e evita conflito de binários Windows x Linux.
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - nginx
+    restart: unless-stopped
+
+volumes:
+  vendor:
+  mysql-dados:
+  frontend-node-modules:

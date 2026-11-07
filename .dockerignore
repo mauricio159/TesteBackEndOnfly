@@ -1,0 +1,10 @@
+.git
+.env
+vendor
+node_modules
+frontend
+postman
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
