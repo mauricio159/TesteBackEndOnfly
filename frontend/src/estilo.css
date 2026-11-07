@@ -1,0 +1,111 @@
+/* Estilo simples, sem framework de CSS, para o front ficar leve e fácil de ler. */
+:root {
+  --fundo: #f4f6fa;
+  --cartao: #ffffff;
+  --texto: #1d2433;
+  --suave: #667085;
+  --borda: #e3e7ee;
+  --primaria: #1f5fd1;
+  --primaria-escura: #174aa6;
+  --sucesso: #13804b;
+  --sucesso-fundo: #e3f5ea;
+  --perigo: #c2332b;
+  --perigo-fundo: #fbe7e5;
+  --aviso: #8a5a00;
+  --aviso-fundo: #fff3d6;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--texto);
+  background: var(--fundo);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+a { color: var(--primaria); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #eef1f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+
+/* Topo */
+.topo { background: var(--cartao); border-bottom: 1px solid var(--borda); }
+.topo-conteudo { max-width: 1100px; margin: 0 auto; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+.marca { font-weight: 700; color: var(--texto); }
+.menu { display: flex; gap: 1rem; flex: 1; }
+.menu a { color: var(--suave); }
+.menu a.router-link-exact-active { color: var(--primaria); font-weight: 600; }
+.usuario { display: flex; gap: 0.6rem; align-items: center; }
+
+.conteudo { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+/* Blocos */
+.cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.cartao.sem-espaco { padding: 0; overflow: hidden; }
+.cabecalho-pagina { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.cabecalho-pagina h1 { margin: 0; }
+.suave { color: var(--suave); }
+.vazio { padding: 2rem; text-align: center; color: var(--suave); margin: 0; }
+.voltar { display: inline-block; margin-bottom: 1rem; }
+
+/* Formulários */
+label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; color: var(--suave); }
+input, select { font: inherit; font-weight: 400; color: var(--texto); padding: 0.5rem 0.65rem; border: 1px solid var(--borda); border-radius: 6px; background: #fff; }
+input:focus, select:focus { outline: 2px solid var(--primaria); outline-offset: -1px; }
+fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 0.4rem; align-items: flex-end; flex-wrap: wrap; }
+legend { font-size: 0.85rem; font-weight: 600; color: var(--suave); margin-bottom: 0.3rem; }
+.formulario { max-width: 560px; display: flex; flex-direction: column; gap: 1rem; }
+.lado-a-lado { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.erro-campo { color: var(--perigo); font-weight: 400; }
+.filtros { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+
+/* Botões */
+.botao { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-weight: 600; padding: 0.55rem 1rem; border-radius: 6px; border: 1px solid var(--primaria); background: var(--primaria); color: #fff; cursor: pointer; text-decoration: none; }
+.botao:hover { background: var(--primaria-escura); text-decoration: none; }
+.botao:disabled { opacity: 0.6; cursor: wait; }
+.botao.secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
+.botao.secundario:hover { background: #f0f2f6; }
+.botao.sucesso { background: var(--sucesso); border-color: var(--sucesso); }
+.botao.perigo { background: var(--perigo); border-color: var(--perigo); }
+.botao.pequeno { padding: 0.3rem 0.65rem; font-size: 0.85rem; }
+.acoes { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.pergunta { font-size: 0.85rem; font-weight: 600; }
+
+/* Etiquetas de status */
+.etiqueta { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize; background: #eef1f6; }
+.etiqueta.solicitado { background: var(--aviso-fundo); color: var(--aviso); }
+.etiqueta.aprovado { background: var(--sucesso-fundo); color: var(--sucesso); }
+.etiqueta.cancelado { background: var(--perigo-fundo); color: var(--perigo); }
+.etiqueta.admin { background: #e6edfb; color: var(--primaria); }
+
+/* Mensagens */
+.alerta { padding: 0.75rem 1rem; border-radius: 8px; margin: 0 0 1rem; }
+.alerta.erro { background: var(--perigo-fundo); color: var(--perigo); }
+.alerta.sucesso { background: var(--sucesso-fundo); color: var(--sucesso); }
+
+/* Tabela */
+.tabela-rolagem { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--suave); background: #fafbfd; }
+tbody tr:last-child td { border-bottom: 0; }
+.paginacao { display: flex; justify-content: center; align-items: center; gap: 1rem; color: var(--suave); }
+
+/* Detalhe */
+.detalhes { display: grid; grid-template-columns: max-content 1fr; gap: 0.6rem 1.5rem; margin: 0 0 1.25rem; }
+.detalhes dt { color: var(--suave); }
+.detalhes dd { margin: 0; }
+
+/* Login */
+.login { max-width: 420px; margin: 4rem auto; }
+.login form { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
+.demo { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--borda); display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.demo p { width: 100%; margin: 0 0 0.25rem; font-size: 0.9rem; }
+
+/* Notificações */
+.lista-notificacoes { list-style: none; margin: 0; padding: 0; }
+.lista-notificacoes li { display: flex; gap: 1rem; align-items: center; padding: 0.9rem 1rem; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+.lista-notificacoes li:last-child { border-bottom: 0; }
+.lista-notificacoes a { flex: 1; }
+
+@media (max-width: 640px) {
+  .lado-a-lado { grid-template-columns: 1fr; }
+  .menu { order: 3; width: 100%; }
+}
