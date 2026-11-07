@@ -48,7 +48,9 @@ class StatusDoPedidoAlterado extends Notification implements ShouldQueue
             ->greeting("Olá, {$pedido->nome_solicitante}!")
             ->line("Seu pedido de viagem para **{$pedido->destino}** foi **{$status}**.")
             ->line('Ida: '.$pedido->data_ida->format('d/m/Y').' · Volta: '.$pedido->data_volta->format('d/m/Y'))
-            ->line("Código do pedido: {$pedido->id}");
+            ->line("Código do pedido: {$pedido->id}")
+            // Sem isso, o template padrão do Laravel assina "Regards," em inglês.
+            ->salutation("Atenciosamente,\nEquipe de Viagens Corporativas");
 
         return $this->status === StatusPedido::Aprovado
             ? $mensagem->line('Boa viagem!')

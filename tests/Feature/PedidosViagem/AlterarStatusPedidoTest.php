@@ -94,6 +94,12 @@ class AlterarStatusPedidoTest extends TestCase
         $email = $notificacao->toMail($pedido->usuario);
         $this->assertSame('Seu pedido de viagem para Lisboa, Portugal foi aprovado', $email->subject);
         $this->assertSame('Olá, Ana Souza!', $email->greeting);
+        $this->assertSame("Atenciosamente,\nEquipe de Viagens Corporativas", $email->salutation);
+
+        // O rodapé do e-mail também precisa estar em português.
+        $html = (string) $email->render();
+        $this->assertStringContainsString('Todos os direitos reservados.', $html);
+        $this->assertStringNotContainsString('Regards', $html);
 
         $this->assertSame([
             'pedido_id' => $pedido->id,
