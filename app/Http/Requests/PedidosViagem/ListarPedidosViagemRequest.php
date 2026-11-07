@@ -32,6 +32,8 @@ class ListarPedidosViagemRequest extends FormRequest
             'criado_ate' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:criado_de'],
             'viagem_de' => ['sometimes', 'date_format:Y-m-d'],
             'viagem_ate' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:viagem_de'],
+            // ?atrasados=1 → só pedidos parados há mais tempo que o limite (config/pedidos.php).
+            'atrasados' => ['sometimes', 'boolean'],
             'por_pagina' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'pagina' => ['sometimes', 'integer', 'min:1'],
         ];

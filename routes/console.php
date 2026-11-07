@@ -1,8 +1,11 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+/*
+| Tarefas agendadas. Quem executa é o container "scheduler" (php artisan schedule:work).
+*/
+
+// De hora em hora, lembra os administradores dos pedidos parados há tempo demais.
+// withoutOverlapping: se uma execução demorar, a próxima não começa por cima dela.
+Schedule::command('pedidos:lembrar-pendentes')->hourly()->withoutOverlapping();

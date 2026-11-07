@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { api, formatarData, formatarDataHora } from '../api'
+import { tempoDesde } from '../relogio'
 import StatusEtiqueta from '../componentes/StatusEtiqueta.vue'
 import AcoesDoAdministrador from '../componentes/AcoesDoAdministrador.vue'
 
@@ -30,11 +31,15 @@ function aoAlterar(atualizado) {
 
   <p v-if="mensagem" class="alerta" :class="mensagem.tipo">{{ mensagem.texto }}</p>
 
-  <div v-if="pedido" class="cartao">
+  <div v-if="pedido" class="cartao" :class="{ 'cartao-atrasado': pedido.atrasado }">
     <div class="cabecalho-pagina">
       <h1>{{ pedido.destino }}</h1>
-      <StatusEtiqueta :status="pedido.status" :rotulo="pedido.status_rotulo" />
+      <StatusEtiqueta :pedido="pedido" />
     </div>
+
+    <p v-if="pedido.atrasado" class="alerta aviso">
+      ⚠ Este pedido aguarda uma decisão {{ tempoDesde(pedido.criado_em) }}, mais do que o prazo esperado.
+    </p>
 
     <dl class="detalhes">
       <dt>Solicitante</dt>
@@ -45,6 +50,12 @@ function aoAlterar(atualizado) {
       <dd>{{ formatarData(pedido.data_volta) }}</dd>
       <dt>Pedido em</dt>
       <dd>{{ formatarDataHora(pedido.criado_em) }}</dd>
+      <template v-if="pedido.decisao">
+        <dt>{{ pedido.status_rotulo }} por</dt>
+        <dd><strong>{{ pedido.decisao.por.nome }}</strong></dd>
+        <dt>{{ pedido.status_rotulo }} em</dt>
+        <dd>{{ formatarDataHora(pedido.decisao.em) }}</dd>
+      </template>
       <dt>Última atualização</dt>
       <dd>{{ formatarDataHora(pedido.atualizado_em) }}</dd>
       <dt>Código</dt>

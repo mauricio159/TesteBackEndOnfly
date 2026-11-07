@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\StatusPedido;
 use App\Models\PedidoViagem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -21,6 +22,8 @@ class PedidoViagemResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $aguardando = $this->status === StatusPedido::Solicitado;
+
         return [
             'id' => $this->id,
             'solicitante' => [
@@ -32,6 +35,23 @@ class PedidoViagemResource extends JsonResource
             'data_volta' => $this->data_volta->toDateString(),
             'status' => $this->status->value,
             'status_rotulo' => $this->status->rotulo(),
+
+            // Auditoria: quem aprovou/cancelou e quando. Nulo enquanto aguarda.
+            'decisao' => $this->decidido_em ? [
+                'por' => [
+                    'id' => $this->decidido_por_id,
+                    'nome' => $this->decididoPor?->nome,
+                ],
+                'em' => $this->decidido_em->toIso8601String(),
+            ] : null,
+
+            // Há quanto tempo o pedido espera uma decisão ("há 3 dias e 4 horas").
+            'tempo_aguardando' => $aguardando
+                ? $this->criado_em->locale('pt_BR')->diffForHumans(['parts' => 2, 'join' => true])
+                : null,
+            // Passou do prazo configurado sem decisão → o front destaca.
+            'atrasado' => $this->estaAtrasado(),
+
             'criado_em' => $this->criado_em?->toIso8601String(),
             'atualizado_em' => $this->atualizado_em?->toIso8601String(),
         ];

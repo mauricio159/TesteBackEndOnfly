@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Cadastro, login, logout e perfil.
+ * Login, logout e perfil.
  * Não é requisito direto do desafio, mas sem autenticação não teria como
  * saber quem é o solicitante e quem é o administrador.
  */
@@ -15,57 +15,30 @@ class AutenticacaoTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_colaborador_se_cadastra_e_recebe_um_token(): void
-    {
-        $this->postJson('/api/v1/auth/cadastro', [
-            'nome' => 'Maria Silva',
-            'email' => 'maria@viagens.test',
-            'senha' => 'senha123',
-            'senha_confirmacao' => 'senha123',
-        ])
-            ->assertCreated()
-            ->assertJsonStructure(['token', 'tipo_token', 'usuario' => ['id', 'nome', 'email', 'administrador']])
-            ->assertJsonPath('usuario.nome', 'Maria Silva')
-            ->assertJsonPath('usuario.administrador', false);
-    }
-
-    public function test_cadastro_nao_permite_se_tornar_administrador(): void
-    {
-        // Tentativa de "mass assignment": mandar administrador=true no corpo.
-        $this->postJson('/api/v1/auth/cadastro', [
-            'nome' => 'Espertinho',
-            'email' => 'espertinho@viagens.test',
-            'senha' => 'senha123',
-            'senha_confirmacao' => 'senha123',
-            'administrador' => true,
-        ])->assertCreated();
-
-        $this->assertFalse(Usuario::where('email', 'espertinho@viagens.test')->first()->ehAdministrador());
-    }
-
-    public function test_cadastro_valida_os_dados_com_mensagens_em_portugues(): void
-    {
-        Usuario::factory()->create(['email' => 'ja.existe@viagens.test']);
-
-        $this->postJson('/api/v1/auth/cadastro', [
-            'nome' => '',
-            'email' => 'ja.existe@viagens.test',
-            'senha' => '123',
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['nome', 'email', 'senha'])
-            ->assertJsonPath('errors.nome.0', 'O campo nome é obrigatório.')
-            ->assertJsonPath('errors.email.0', 'Este e-mail já está em uso.');
-    }
-
     public function test_login_com_dados_corretos_devolve_token(): void
     {
-        $usuario = Usuario::factory()->create(['senha' => 'senha123']);
+        $usuario = Usuario::factory()->create(['nome' => 'Maria Silva', 'senha' => 'senha123']);
 
         $this->postJson('/api/v1/auth/login', [
             'email' => $usuario->email,
             'senha' => 'senha123',
-        ])->assertOk()->assertJsonStructure(['token']);
+        ])
+            ->assertOk()
+            ->assertJsonStructure(['token', 'tipo_token', 'usuario' => ['id', 'nome', 'email', 'administrador']])
+            ->assertJsonPath('usuario.nome', 'Maria Silva');
+    }
+
+    public function test_nao_existe_cadastro_publico(): void
+    {
+        // Contas são criadas pelo administrador (POST /usuarios), não por quem chega de fora.
+        $this->postJson('/api/v1/auth/cadastro', [
+            'nome' => 'Pessoa de Fora',
+            'email' => 'fora@viagens.test',
+            'senha' => 'senha123',
+            'senha_confirmacao' => 'senha123',
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('usuarios', ['email' => 'fora@viagens.test']);
     }
 
     public function test_login_com_senha_errada_e_recusado(): void

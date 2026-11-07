@@ -44,6 +44,18 @@ services:
       app:
         condition: service_healthy
 
+  # Agendador: roda as tarefas de routes/console.php no horário certo
+  # (ex.: lembrete de pedidos parados, de hora em hora). É o "cron" do Laravel.
+  scheduler:
+    <<: *php-comum
+    user: www-data
+    environment:
+      CONTAINER_ROLE: scheduler
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      app:
+        condition: service_healthy
+
   # Servidor web: recebe o HTTP na porta 8000 e repassa para o PHP-FPM.
   nginx:
     image: nginx:1.27-alpine

@@ -22,6 +22,7 @@ async function sair() {
         <RouterLink to="/pedidos">Pedidos</RouterLink>
         <RouterLink to="/pedidos/novo">Novo pedido</RouterLink>
         <RouterLink to="/notificacoes">Notificações</RouterLink>
+        <RouterLink v-if="sessao.usuario?.administrador" to="/equipe">Equipe</RouterLink>
       </nav>
 
       <div class="usuario">

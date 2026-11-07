@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AlterarStatusPedidoController;
 use App\Http\Controllers\Api\V1\AutenticacaoController;
 use App\Http\Controllers\Api\V1\NotificacaoController;
 use App\Http\Controllers\Api\V1\PedidoViagemController;
+use App\Http\Controllers\Api\V1\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,10 +15,10 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('v1')->name('v1.')->group(function () {
 
-    // Autenticação. Cadastro e login têm limite próprio de tentativas
-    // (veja AppServiceProvider) para dificultar ataque de força bruta.
+    // Autenticação. O login tem limite próprio de tentativas (veja
+    // AppServiceProvider) para dificultar ataque de força bruta.
+    // Não há cadastro público: quem cadastra a equipe é o administrador (/usuarios).
     Route::prefix('auth')->name('auth.')->controller(AutenticacaoController::class)->group(function () {
-        Route::post('cadastro', 'cadastrar')->middleware('throttle:autenticacao')->name('cadastro');
         Route::post('login', 'login')->middleware('throttle:autenticacao')->name('login');
 
         Route::middleware('auth:sanctum')->group(function () {
@@ -36,5 +37,9 @@ Route::prefix('v1')->name('v1.')->group(function () {
             ->name('pedidos-viagem.status');
 
         Route::get('notificacoes', NotificacaoController::class)->name('notificacoes');
+
+        // Só administradores (checado na Policy): ver a equipe e cadastrar
+        // colaboradores ou outros administradores.
+        Route::apiResource('usuarios', UsuarioController::class)->only(['index', 'store']);
     });
 });

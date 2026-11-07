@@ -23,7 +23,7 @@ class AlterarStatusPedidoController extends Controller
         PedidoViagem $pedido,
         PedidoViagemService $pedidos,
     ): PedidoViagemResource {
-        $atualizado = $pedidos->alterarStatus($pedido, $request->novoStatus());
+        $atualizado = $pedidos->alterarStatus($pedido, $request->novoStatus(), $request->user());
 
         return new PedidoViagemResource($atualizado);
     }

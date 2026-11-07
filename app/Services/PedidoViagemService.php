@@ -32,24 +32,27 @@ class PedidoViagemService
     }
 
     /**
-     * Aprova ou cancela um pedido e avisa quem pediu.
+     * Aprova ou cancela um pedido, registra quem decidiu e avisa quem pediu.
      *
      * @throws MudancaDeStatusInvalida
      */
-    public function alterarStatus(PedidoViagem $pedido, StatusPedido $novoStatus): PedidoViagem
+    public function alterarStatus(PedidoViagem $pedido, StatusPedido $novoStatus, Usuario $responsavel): PedidoViagem
     {
-        $atualizado = DB::transaction(function () use ($pedido, $novoStatus) {
+        $atualizado = DB::transaction(function () use ($pedido, $novoStatus, $responsavel) {
             // SELECT ... FOR UPDATE: imagine dois administradores clicando ao
             // mesmo tempo, um em "aprovar" e outro em "cancelar". O segundo
             // espera o primeiro terminar, lê o status já atualizado e cai na
             // regra de negócio, em vez de sobrescrever a decisão do colega.
             $travado = PedidoViagem::query()->lockForUpdate()->findOrFail($pedido->getKey());
 
-            $travado->mudarStatusPara($novoStatus);
+            $travado->mudarStatusPara($novoStatus, $responsavel);
             $travado->save();
 
             return $travado;
         });
+
+        // Já deixamos carregado quem decidiu: a resposta da API e a notificação mostram o nome.
+        $atualizado->setRelation('decididoPor', $responsavel);
 
         // Notificamos só DEPOIS do commit: se algo desse errado e a transação
         // fosse desfeita, o colaborador não receberia um aviso falso.

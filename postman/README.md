@@ -11,7 +11,7 @@ Um único arquivo, pronto para importar: **`pedidos-viagem.postman_collection.js
    ```
 2. No Postman: **Import** → arraste o arquivo `pedidos-viagem.postman_collection.json`.
 3. Escolha uma das opções:
-   - **Rodar tudo de uma vez:** clique com o botão direito na coleção → **Run collection** → **Run**. São 25 requisições com 55 verificações automáticas, executadas em ordem.
+   - **Rodar tudo de uma vez:** clique com o botão direito na coleção → **Run collection** → **Run**. São 36 requisições com 78 verificações automáticas, executadas em ordem.
    - **Ir passo a passo:** abra as pastas e envie as requisições **de cima para baixo**. Comece sempre pelos três logins da pasta *1. Autenticação*.
 
 Não é preciso configurar ambiente, copiar token nem colar ID: os scripts fazem isso sozinhos.
@@ -20,11 +20,12 @@ Não é preciso configurar ambiente, copiar token nem colar ID: os scripts fazem
 
 | Pasta | O que demonstra |
 |---|---|
-| 1. Autenticação | Login dos 3 usuários do seeder, cadastro (que não deixa virar admin), senha errada (401) e perfil |
+| 1. Autenticação | Login dos 3 usuários do seeder, prova de que não existe cadastro público (404), senha errada (401) e perfil |
 | 2. Pedidos de viagem | Criar pedido, validações (422), consultar por ID e listar com cada filtro do desafio: status, destino, período da viagem, período de criação, filtros combinados e paginação |
-| 3. Aprovação e cancelamento | Solicitante tentando aprovar o próprio pedido (403), colega tentando ver pedido alheio (403), admin aprovando (200), **cancelar pedido aprovado bloqueado (422)** e cancelamento de pedido ainda solicitado (200) |
+| 3. Aprovação e cancelamento | Solicitante tentando aprovar o próprio pedido (403), colega tentando ver pedido alheio (403), admin aprovando (200, com **quem e quando** registrados), **cancelar pedido aprovado bloqueado (422)** e cancelamento de pedido ainda solicitado (200) |
 | 4. Notificações | A Ana encontra o aviso de aprovação em `GET /notificacoes` |
-| 5. Encerrar sessão | Logout (204) e prova de que o token deixou de valer (401) |
+| 5. Equipe e pedidos atrasados | Carla cadastra uma colaboradora (que já consegue entrar) e um novo administrador, colaboradora não consegue cadastrar ninguém (403), listagem da equipe, a Carla não aprova a própria viagem (403), mas o **novo administrador aprova**; listagem só dos **atrasados** e lembretes |
+| 6. Encerrar sessão | Logout (204) e prova de que o token deixou de valer (401) |
 
 ## Como os scripts funcionam
 
@@ -64,7 +65,8 @@ Clique na coleção → aba **Variables**.
 |---|---|
 | `base_url` | Endereço da API (`http://localhost:8000/api/v1`). Mude aqui se usar outra porta. |
 | `token_admin`, `token_ana`, `token_bruno` | Preenchidas pelos logins |
-| `pedido_id`, `segundo_pedido_id` | Preenchidas ao criar pedidos |
+| `pedido_id`, `segundo_pedido_id`, `pedido_carla_id` | Preenchidas ao criar pedidos |
+| `email_nova_colaboradora`, `email_novo_admin`, `token_novo_admin` | Preenchidas ao cadastrar as novas pessoas da equipe |
 | `data_ida`, `data_volta` | Calculadas automaticamente |
 
 ## Rodar pela linha de comando (opcional)
@@ -75,4 +77,4 @@ Dá para executar a mesma coleção sem abrir o Postman, com o [Newman](https://
 docker run --rm --network pedidos-viagem_default -v "${PWD}/postman:/etc/newman" postman/newman:6-alpine run pedidos-viagem.postman_collection.json --env-var "base_url=http://nginx/api/v1"
 ```
 
-> O cadastro e o login têm limite de 10 tentativas por minuto (proteção contra força bruta). Se rodar a coleção muitas vezes seguidas e receber **429**, espere um minuto.
+> O login tem limite de 10 tentativas por minuto (proteção contra força bruta). Se rodar a coleção muitas vezes seguidas e receber **429**, espere um minuto.

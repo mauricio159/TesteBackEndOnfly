@@ -4,13 +4,14 @@ import { api, formatarData, formatarDataHora } from '../api'
 import { sessao } from '../sessao'
 import StatusEtiqueta from '../componentes/StatusEtiqueta.vue'
 import AcoesDoAdministrador from '../componentes/AcoesDoAdministrador.vue'
+import DecisaoDoPedido from '../componentes/DecisaoDoPedido.vue'
 
 /*
  * Listagem com os filtros pedidos no desafio: status, destino e período
  * (de criação do pedido ou das datas da viagem). Os nomes dos campos são
  * exatamente os parâmetros que a API espera.
  */
-const filtrosVazios = { status: '', destino: '', criado_de: '', criado_ate: '', viagem_de: '', viagem_ate: '' }
+const filtrosVazios = { status: '', destino: '', criado_de: '', criado_ate: '', viagem_de: '', viagem_ate: '', atrasados: false }
 
 const filtros = reactive({ ...filtrosVazios })
 const pedidos = ref([])
@@ -23,7 +24,8 @@ async function carregar() {
   carregando.value = true
   try {
     const resposta = await api('/pedidos-viagem', {
-      consulta: { ...filtros, pagina: pagina.value, por_pagina: 10 },
+      // "atrasados" só vai na URL quando marcado (a API espera 1).
+      consulta: { ...filtros, atrasados: filtros.atrasados ? 1 : '', pagina: pagina.value, por_pagina: 10 },
     })
     pedidos.value = resposta.data
     paginacao.value = resposta.meta
@@ -34,6 +36,22 @@ async function carregar() {
   } finally {
     carregando.value = false
   }
+}
+
+// Quantos pedidos estão parados há tempo demais. Os atrasados costumam ficar
+// no fim da lista (ela é ordenada dos mais novos para os mais antigos), então
+// o aviso no topo garante que o administrador não deixe nenhum passar.
+const totalAtrasados = ref(0)
+
+async function contarAtrasados() {
+  if (!sessao.usuario?.administrador) return
+  const resposta = await api('/pedidos-viagem', { consulta: { atrasados: 1, por_pagina: 1 } })
+  totalAtrasados.value = resposta.meta.total
+}
+
+function verAtrasados() {
+  Object.assign(filtros, filtrosVazios, { atrasados: true })
+  filtrar()
 }
 
 function filtrar() {
@@ -55,19 +73,31 @@ function irParaPagina(numero) {
 function aoAlterar(pedidoAtualizado) {
   const indice = pedidos.value.findIndex((p) => p.id === pedidoAtualizado.id)
   pedidos.value[indice] = pedidoAtualizado
+  contarAtrasados()
   mensagem.value = {
     tipo: 'sucesso',
     texto: `Pedido ${pedidoAtualizado.status_rotulo.toLowerCase()}. ${pedidoAtualizado.solicitante.nome} será notificado(a).`,
   }
 }
 
-onMounted(carregar)
+onMounted(() => {
+  carregar()
+  contarAtrasados()
+})
 </script>
 
 <template>
   <div class="cabecalho-pagina">
     <h1>{{ sessao.usuario?.administrador ? 'Todos os pedidos' : 'Meus pedidos' }}</h1>
     <RouterLink to="/pedidos/novo" class="botao">+ Novo pedido</RouterLink>
+  </div>
+
+  <div v-if="totalAtrasados" class="alerta aviso faixa-atrasados">
+    <span>
+      ⚠ <strong>{{ totalAtrasados }} pedido{{ totalAtrasados > 1 ? 's' : '' }}</strong>
+      aguardando aprovação além do prazo.
+    </span>
+    <button class="botao pequeno" @click="verAtrasados">Ver atrasados</button>
   </div>
 
   <form class="cartao filtros" @submit.prevent="filtrar">
@@ -94,6 +124,10 @@ onMounted(carregar)
       <input v-model="filtros.viagem_de" type="date" aria-label="Viagem de" />
       <input v-model="filtros.viagem_ate" type="date" aria-label="Viagem até" />
     </fieldset>
+    <label class="opcao">
+      <input v-model="filtros.atrasados" type="checkbox" />
+      Só atrasados
+    </label>
     <div class="acoes">
       <button class="botao">Filtrar</button>
       <button type="button" class="botao secundario" @click="limpar">Limpar</button>
@@ -116,19 +150,22 @@ onMounted(carregar)
             <th>Volta</th>
             <th>Status</th>
             <th>Pedido em</th>
+            <th>Decidido por</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="pedido in pedidos" :key="pedido.id">
+          <!-- Pedido parado há tempo demais ganha destaque (classe "atrasado"). -->
+          <tr v-for="pedido in pedidos" :key="pedido.id" :class="{ atrasado: pedido.atrasado }">
             <td>
               <RouterLink :to="`/pedidos/${pedido.id}`">{{ pedido.destino }}</RouterLink>
             </td>
             <td v-if="sessao.usuario?.administrador">{{ pedido.solicitante.nome }}</td>
             <td>{{ formatarData(pedido.data_ida) }}</td>
             <td>{{ formatarData(pedido.data_volta) }}</td>
-            <td><StatusEtiqueta :status="pedido.status" :rotulo="pedido.status_rotulo" /></td>
+            <td><StatusEtiqueta :pedido="pedido" /></td>
             <td class="suave">{{ formatarDataHora(pedido.criado_em) }}</td>
+            <td><DecisaoDoPedido :pedido="pedido" /></td>
             <td>
               <AcoesDoAdministrador
                 :pedido="pedido"

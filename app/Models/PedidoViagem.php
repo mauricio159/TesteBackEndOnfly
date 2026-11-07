@@ -24,13 +24,17 @@ use Illuminate\Support\Carbon;
  * @property Carbon $data_ida
  * @property Carbon $data_volta
  * @property StatusPedido $status
+ * @property int|null $decidido_por_id
+ * @property Carbon|null $decidido_em
+ * @property Carbon|null $ultimo_lembrete_em
  * @property Carbon $criado_em
  * @property Carbon $atualizado_em
  * @property-read Usuario $usuario
+ * @property-read Usuario|null $decididoPor
  *
- * "status" e "usuario_id" ficam fora do fillable: o dono vem do usuário
- * logado e o status só muda pela regra de negócio (mudarStatusPara).
- * Mesmo que alguém mande esses campos no JSON, eles são ignorados.
+ * "status", "usuario_id" e os campos da decisão ficam fora do fillable: o dono
+ * vem do usuário logado e a decisão só acontece pela regra de negócio
+ * (mudarStatusPara). Mesmo que alguém mande esses campos no JSON, são ignorados.
  */
 #[Fillable(['nome_solicitante', 'destino', 'data_ida', 'data_volta'])]
 class PedidoViagem extends Model
@@ -55,10 +59,14 @@ class PedidoViagem extends Model
             'data_ida' => 'date',
             'data_volta' => 'date',
             'status' => StatusPedido::class,
+            'decidido_em' => 'datetime',
+            'ultimo_lembrete_em' => 'datetime',
         ];
     }
 
     /**
+     * Quem fez o pedido.
+     *
      * @return BelongsTo<Usuario, $this>
      */
     public function usuario(): BelongsTo
@@ -67,18 +75,75 @@ class PedidoViagem extends Model
     }
 
     /**
+     * Administrador que aprovou ou cancelou (vazio enquanto está "solicitado").
+     *
+     * @return BelongsTo<Usuario, $this>
+     */
+    public function decididoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'decidido_por_id');
+    }
+
+    /**
      * Único caminho para mudar o status. A regra mora aqui (e no enum), e não
      * no controller, para valer de qualquer lugar: API, comando, job, teste.
      *
+     * Junto com o novo status, grava QUEM decidiu e QUANDO (auditoria).
+     *
      * @throws MudancaDeStatusInvalida
      */
-    public function mudarStatusPara(StatusPedido $novo): void
+    public function mudarStatusPara(StatusPedido $novo, Usuario $responsavel): void
     {
         if (! $this->status->podeMudarPara($novo)) {
             throw new MudancaDeStatusInvalida($this->status, $novo);
         }
 
         $this->status = $novo;
+        $this->decidido_por_id = $responsavel->id;
+        $this->decidido_em = now();
+    }
+
+    /**
+     * A partir de quando um pedido parado vira "atrasado" (config/pedidos.php).
+     */
+    public static function limiteDeAtraso(): Carbon
+    {
+        return now()->subHours(config('pedidos.alerta_apos_horas'));
+    }
+
+    /**
+     * Atrasado = ainda esperando decisão e criado há mais tempo que o limite.
+     * Pedido aprovado ou cancelado nunca está atrasado, já foi resolvido.
+     */
+    public function estaAtrasado(): bool
+    {
+        return $this->status === StatusPedido::Solicitado
+            && $this->criado_em->lessThanOrEqualTo(static::limiteDeAtraso());
+    }
+
+    /**
+     * Mesma regra de estaAtrasado(), só que direto no banco (para filtrar e
+     * para o comando de lembretes, sem carregar tudo em memória).
+     */
+    #[Scope]
+    protected function atrasados(Builder $query): void
+    {
+        $query->where('status', StatusPedido::Solicitado)
+            ->where('criado_em', '<=', static::limiteDeAtraso());
+    }
+
+    /**
+     * Atrasados que ainda não receberam lembrete, ou cujo último lembrete já
+     * é antigo o bastante para repetir.
+     */
+    #[Scope]
+    protected function precisandoDeLembrete(Builder $query): void
+    {
+        $repetirApos = now()->subHours(config('pedidos.repetir_lembrete_apos_horas'));
+
+        $query->atrasados()->where(function (Builder $q) use ($repetirApos) {
+            $q->whereNull('ultimo_lembrete_em')->orWhere('ultimo_lembrete_em', '<=', $repetirApos);
+        });
     }
 
     /**
@@ -120,6 +185,9 @@ class PedidoViagem extends Model
             // Período da VIAGEM: a viagem inteira precisa caber na faixa
             // (ida depois do início e volta antes do fim).
             ->when($filtros['viagem_de'] ?? null, fn (Builder $q, string $data) => $q->whereDate('data_ida', '>=', $data))
-            ->when($filtros['viagem_ate'] ?? null, fn (Builder $q, string $data) => $q->whereDate('data_volta', '<=', $data));
+            ->when($filtros['viagem_ate'] ?? null, fn (Builder $q, string $data) => $q->whereDate('data_volta', '<=', $data))
+
+            // Só os que estão parados há tempo demais esperando decisão.
+            ->when($filtros['atrasados'] ?? false, fn (Builder $q) => $q->atrasados());
     }
 }

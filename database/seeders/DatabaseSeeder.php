@@ -10,12 +10,16 @@ use Illuminate\Database\Seeder;
 /**
  * Dados para demonstrar o sistema na entrevista, sem precisar cadastrar nada.
  *
- *  - Carla Mendes  (admin@viagens.test)  → administradora, aprova/cancela pedidos
- *  - Ana Souza     (ana@viagens.test)    → colaboradora
- *  - Bruno Lima    (bruno@viagens.test)  → colaborador
+ *  - Carla Mendes  (admin@viagens.test)   → administradora
+ *  - Diego Ramos   (diretor@viagens.test) → administrador; aprova as viagens da Carla
+ *  - Ana Souza     (ana@viagens.test)     → colaboradora
+ *  - Bruno Lima    (bruno@viagens.test)   → colaborador
  *
- * Todos com a senha "senha123". Cada colaborador ganha 3 pedidos solicitados,
- * 1 aprovado e 1 cancelado, para a listagem e os filtros já terem o que mostrar.
+ * Todos com a senha "senha123".
+ *
+ * Os colaboradores ganham pedidos em todos os status, incluindo pedidos
+ * parados há dias (aparecem destacados como atrasados). A Carla também tem
+ * uma viagem esperando, que só o Diego pode aprovar.
  *
  * Pode rodar mais de uma vez sem duplicar nada: se o usuário já existe, pula.
  */
@@ -25,21 +29,34 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $this->criarUsuario('Carla Mendes', 'admin@viagens.test', administrador: true);
+        $carla = $this->criarUsuario('Carla Mendes', 'admin@viagens.test', administrador: true);
+        $diego = $this->criarUsuario('Diego Ramos', 'diretor@viagens.test', administrador: true);
+
+        if ($carla->wasRecentlyCreated) {
+            // Viagem da própria administradora: ela não pode aprovar, o Diego pode.
+            PedidoViagem::factory()->for($carla)->aguardandoHa(dias: 1)
+                ->create(['destino' => 'Brasília, DF']);
+        }
 
         $colaboradores = [
-            ['Ana Souza', 'ana@viagens.test'],
-            ['Bruno Lima', 'bruno@viagens.test'],
+            ['Ana Souza', 'ana@viagens.test', 'Recife, PE'],
+            ['Bruno Lima', 'bruno@viagens.test', 'Porto Alegre, RS'],
         ];
 
-        foreach ($colaboradores as [$nome, $email]) {
+        foreach ($colaboradores as $i => [$nome, $email, $destinoAtrasado]) {
             $colaborador = $this->criarUsuario($nome, $email);
 
-            if ($colaborador->wasRecentlyCreated) {
-                PedidoViagem::factory()->for($colaborador)->count(3)->create();
-                PedidoViagem::factory()->for($colaborador)->aprovado()->create();
-                PedidoViagem::factory()->for($colaborador)->cancelado()->create();
+            if (! $colaborador->wasRecentlyCreated) {
+                continue;
             }
+
+            PedidoViagem::factory()->for($colaborador)->count(2)->create();
+            PedidoViagem::factory()->for($colaborador)->aprovado(por: $carla)->create();
+            PedidoViagem::factory()->for($colaborador)->cancelado(por: $diego)->create();
+
+            // Parado há dias esperando decisão → destacado como atrasado.
+            PedidoViagem::factory()->for($colaborador)->aguardandoHa(dias: 3 + $i * 2, horasExtras: 5)
+                ->create(['destino' => $destinoAtrasado]);
         }
     }
 

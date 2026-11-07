@@ -13,6 +13,7 @@ const enviando = ref(false)
 // Usuários criados pelo seeder, para testar sem precisar digitar.
 const usuariosDemo = [
   { nome: 'Carla (administradora)', email: 'admin@viagens.test' },
+  { nome: 'Diego (administrador)', email: 'diretor@viagens.test' },
   { nome: 'Ana (colaboradora)', email: 'ana@viagens.test' },
   { nome: 'Bruno (colaborador)', email: 'bruno@viagens.test' },
 ]
@@ -41,6 +42,7 @@ async function entrar() {
   <div class="cartao login">
     <h1>✈ Pedidos de Viagem</h1>
     <p class="suave">Entre para solicitar ou aprovar viagens corporativas.</p>
+    <p class="suave pequeno">Ainda não tem acesso? Peça ao administrador para cadastrar você.</p>
 
     <form @submit.prevent="entrar">
       <label>

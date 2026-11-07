@@ -53,6 +53,8 @@ return [
         'data_ida' => 'data de ida',
         'data_volta' => 'data de volta',
         'status' => 'status',
+        'administrador' => 'administrador',
+        'perfil' => 'perfil',
         'criado_de' => 'início do período de criação',
         'criado_ate' => 'fim do período de criação',
         'viagem_de' => 'início do período da viagem',

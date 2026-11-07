@@ -38,13 +38,36 @@ class PedidoViagemFactory extends Factory
         ];
     }
 
-    public function aprovado(): static
+    /**
+     * Pedido já aprovado, com o registro de quem aprovou e quando (como na vida real).
+     * Sem informar o administrador, a factory cria um.
+     */
+    public function aprovado(?Usuario $por = null): static
     {
-        return $this->state(['status' => StatusPedido::Aprovado]);
+        return $this->decidido(StatusPedido::Aprovado, $por);
     }
 
-    public function cancelado(): static
+    public function cancelado(?Usuario $por = null): static
     {
-        return $this->state(['status' => StatusPedido::Cancelado]);
+        return $this->decidido(StatusPedido::Cancelado, $por);
+    }
+
+    /**
+     * Pedido feito há alguns dias e ainda sem decisão (vira "atrasado" passado o limite).
+     */
+    public function aguardandoHa(int $dias, int $horasExtras = 0): static
+    {
+        $criadoEm = now()->subDays($dias)->subHours($horasExtras);
+
+        return $this->state(['criado_em' => $criadoEm, 'atualizado_em' => $criadoEm]);
+    }
+
+    private function decidido(StatusPedido $status, ?Usuario $por): static
+    {
+        return $this->state([
+            'status' => $status,
+            'decidido_por_id' => $por?->id ?? Usuario::factory()->administrador(),
+            'decidido_em' => now(),
+        ]);
     }
 }

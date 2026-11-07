@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Autenticacao\CadastroRequest;
 use App\Http\Requests\Autenticacao\LoginRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\Usuario;
@@ -18,16 +17,12 @@ use Illuminate\Support\Facades\Hash;
  * Fluxo: o cliente faz login, recebe um token e manda esse token em toda
  * requisição no header "Authorization: Bearer <token>". Não há sessão nem
  * cookie, o que combina com um microsserviço consumido por outros sistemas.
+ *
+ * Não existe cadastro aqui: contas são criadas por um administrador em
+ * POST /usuarios (UsuarioController).
  */
 class AutenticacaoController extends Controller
 {
-    public function cadastrar(CadastroRequest $request): JsonResponse
-    {
-        $usuario = Usuario::create($request->validated());
-
-        return $this->respostaComToken($usuario, JsonResponse::HTTP_CREATED);
-    }
-
     public function login(LoginRequest $request): JsonResponse
     {
         $usuario = Usuario::where('email', $request->validated('email'))->first();
@@ -38,7 +33,11 @@ class AutenticacaoController extends Controller
             return response()->json(['message' => 'E-mail ou senha inválidos.'], JsonResponse::HTTP_UNAUTHORIZED);
         }
 
-        return $this->respostaComToken($usuario, JsonResponse::HTTP_OK);
+        return response()->json([
+            'token' => $usuario->createToken('api')->plainTextToken,
+            'tipo_token' => 'Bearer',
+            'usuario' => new UsuarioResource($usuario),
+        ]);
     }
 
     public function logout(Request $request): Response
@@ -53,14 +52,5 @@ class AutenticacaoController extends Controller
     public function perfil(Request $request): UsuarioResource
     {
         return new UsuarioResource($request->user());
-    }
-
-    private function respostaComToken(Usuario $usuario, int $status): JsonResponse
-    {
-        return response()->json([
-            'token' => $usuario->createToken('api')->plainTextToken,
-            'tipo_token' => 'Bearer',
-            'usuario' => new UsuarioResource($usuario),
-        ], $status);
     }
 }

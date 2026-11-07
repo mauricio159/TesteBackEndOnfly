@@ -47,7 +47,15 @@ class StatusDoPedidoAlterado extends Notification implements ShouldQueue
             ->subject("Seu pedido de viagem para {$pedido->destino} foi {$status}")
             ->greeting("Olá, {$pedido->nome_solicitante}!")
             ->line("Seu pedido de viagem para **{$pedido->destino}** foi **{$status}**.")
-            ->line('Ida: '.$pedido->data_ida->format('d/m/Y').' · Volta: '.$pedido->data_volta->format('d/m/Y'))
+            ->line('Ida: '.$pedido->data_ida->format('d/m/Y').' · Volta: '.$pedido->data_volta->format('d/m/Y'));
+
+        // Quem decidiu e quando (auditoria), para o colaborador saber a quem recorrer.
+        if ($pedido->decidido_em) {
+            $quando = $pedido->decidido_em->format('d/m/Y').' às '.$pedido->decidido_em->format('H:i');
+            $mensagem->line(ucfirst($status)." por {$pedido->decididoPor?->nome} em {$quando}.");
+        }
+
+        $mensagem
             ->line("Código do pedido: {$pedido->id}")
             // Sem isso, o template padrão do Laravel assina "Regards," em inglês.
             ->salutation("Atenciosamente,\nEquipe de Viagens Corporativas");
@@ -65,14 +73,20 @@ class StatusDoPedidoAlterado extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         $status = mb_strtolower($this->status->rotulo());
+        $responsavel = $this->pedido->decididoPor?->nome;
 
         return [
+            // "tipo" diferencia este aviso do lembrete de pedido parado.
+            'tipo' => 'status_alterado',
             'pedido_id' => $this->pedido->id,
             'status' => $this->status->value,
             'destino' => $this->pedido->destino,
             'data_ida' => $this->pedido->data_ida->toDateString(),
             'data_volta' => $this->pedido->data_volta->toDateString(),
-            'mensagem' => "Seu pedido de viagem para {$this->pedido->destino} foi {$status}.",
+            'decidido_por' => $responsavel,
+            'decidido_em' => $this->pedido->decidido_em?->toIso8601String(),
+            'mensagem' => "Seu pedido de viagem para {$this->pedido->destino} foi {$status}"
+                .($responsavel ? " por {$responsavel}" : '').'.',
         ];
     }
 }

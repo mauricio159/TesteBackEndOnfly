@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
-        // Cadastro e login: limite bem menor, por e-mail + IP, para dificultar
+        // Login: limite bem menor, por e-mail + IP, para dificultar
         // quem tenta adivinhar senhas na base da tentativa e erro.
         RateLimiter::for('autenticacao', function (Request $request) {
             return Limit::perMinute(10)->by($request->string('email')->lower().'|'.$request->ip());

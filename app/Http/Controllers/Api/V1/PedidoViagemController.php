@@ -33,6 +33,8 @@ class PedidoViagemController extends Controller
         $pedidos = PedidoViagem::query()
             ->visivelPara($request->user())
             ->filtrar($request->validated())
+            // Carrega quem decidiu de uma vez só (evita uma consulta por linha, o famoso N+1).
+            ->with('decididoPor')
             ->latest()
             ->paginate(perPage: $request->integer('por_pagina', 15), pageName: 'pagina')
             ->withQueryString();

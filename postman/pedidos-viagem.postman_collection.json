@@ -254,7 +254,7 @@
           ]
         },
         {
-          "name": "Cadastrar novo colaborador",
+          "name": "Cadastro público está desativado",
           "request": {
             "method": "POST",
             "header": [
@@ -277,13 +277,13 @@
                 "cadastro"
               ]
             },
-            "description": "Cria um usuário comum. Mesmo mandando \"administrador\": true, ele NÃO vira administrador.",
+            "description": "Ninguém cria conta sozinho: quem cadastra a equipe é o administrador (pasta 5, POST /usuarios).",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Pessoa de Teste\",\n  \"email\": \"{{email_aleatorio}}\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\",\n  \"administrador\": true\n}",
+              "raw": "{\n  \"nome\": \"Pessoa de Fora\",\n  \"email\": \"fora@viagens.test\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -293,24 +293,11 @@
           },
           "event": [
             {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Gera um e-mail diferente a cada execução, porque o e-mail precisa ser único.",
-                  "pm.variables.set('email_aleatorio', `teste.${Date.now()}@viagens.test`);"
-                ]
-              }
-            },
-            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Usuário criado (201)', () => pm.response.to.have.status(201));",
-                  "pm.test('Não virou administrador, mesmo pedindo', () => {",
-                  "  pm.expect(pm.response.json().usuario.administrador).to.be.false;",
-                  "});"
+                  "pm.test('Rota não existe (404)', () => pm.response.to.have.status(404));"
                 ]
               }
             }
@@ -1137,6 +1124,13 @@
                   "pm.test('Aprovado (200)', () => {",
                   "  pm.response.to.have.status(200);",
                   "  pm.expect(pm.response.json().data.status).to.eql('aprovado');",
+                  "});",
+                  "",
+                  "// Auditoria: a resposta já diz QUEM aprovou e QUANDO.",
+                  "pm.test('Registra quem aprovou e quando', () => {",
+                  "  const decisao = pm.response.json().data.decisao;",
+                  "  pm.expect(decisao.por.nome).to.eql('Carla Mendes');",
+                  "  pm.expect(decisao.em).to.be.a('string');",
                   "});"
                 ]
               }
@@ -1388,7 +1382,624 @@
       ]
     },
     {
-      "name": "5. Encerrar sessão",
+      "name": "5. Equipe e pedidos atrasados",
+      "description": "O administrador cadastra colaboradores e administradores; um administrador aprova a viagem do outro; destaque e lembrete de pedidos parados.",
+      "item": [
+        {
+          "name": "Carla cadastra uma colaboradora",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Sem o campo \"administrador\" (ou com false), a pessoa entra como colaboradora.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Colaboradora de Teste\",\n  \"email\": \"{{email_nova_colaboradora}}\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// E-mail único a cada execução, porque o e-mail não pode se repetir.",
+                  "pm.collectionVariables.set('email_nova_colaboradora', `colaboradora.${Date.now()}@viagens.test`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Colaboradora criada (201)', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.json().data.administrador).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nova colaboradora faz login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_nova_colaboradora}}\",\n  \"senha\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login realizado com a senha inicial (200)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Carla cadastra um novo administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Mesmo endpoint, com \"administrador\": true. Útil porque ninguém aprova a própria viagem.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Gestor de Teste\",\n  \"email\": \"{{email_novo_admin}}\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\",\n  \"administrador\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// E-mail único a cada execução, guardado para o login logo abaixo.",
+                  "pm.collectionVariables.set('email_novo_admin', `gestor.${Date.now()}@viagens.test`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Administrador criado (201)', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.json().data.administrador).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Colaboradora tenta cadastrar alguém",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Tentativa\",\n  \"email\": \"tentativa@viagens.test\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Proibido (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar a equipe",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "Administradores primeiro, depois em ordem alfabética. Filtro opcional: ?perfil=colaborador ou ?perfil=administrador.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('As duas pessoas cadastradas aparecem', () => {",
+                  "  const emails = pm.response.json().data.map((u) => u.email);",
+                  "  pm.expect(emails).to.include(pm.collectionVariables.get('email_novo_admin'));",
+                  "  pm.expect(emails).to.include(pm.collectionVariables.get('email_nova_colaboradora'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login do novo administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email_novo_admin}}\",\n  \"senha\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login realizado (200)', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_novo_admin', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Carla pede uma viagem para ela mesma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destino\": \"Brasília, DF\",\n  \"data_ida\": \"{{data_ida}}\",\n  \"data_volta\": \"{{data_volta}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pedido criado (201)', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('pedido_carla_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Carla tenta aprovar a própria viagem",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_carla_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_carla_id}}",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"aprovado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Proibido, mesmo sendo administradora (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Novo administrador aprova a viagem da Carla",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_carla_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_carla_id}}",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_novo_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"aprovado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Aprovado (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Decisão registrada em nome do novo administrador', () => {",
+                  "  pm.expect(pm.response.json().data.decisao.por.nome).to.eql('Gestor de Teste');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar só os pedidos atrasados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?atrasados=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "atrasados",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Pedidos \"solicitado\" há mais de PEDIDO_ALERTA_APOS_HORAS (padrão 48h). O seeder cria dois.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Todos vêm marcados como atrasados e com o tempo de espera', () => {",
+                  "  pm.response.json().data.forEach((p) => {",
+                  "    pm.expect(p.atrasado).to.be.true;",
+                  "    pm.expect(p.tempo_aguardando).to.match(/^há /);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lembretes do administrador",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notificacoes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notificacoes"
+              ]
+            },
+            "description": "Lembretes gerados pelo comando agendado pedidos:lembrar-pendentes (roda de hora em hora). Para gerar na hora: docker compose exec app php artisan pedidos:lembrar-pendentes",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const lembretes = pm.response.json().data.filter((n) => n.dados.tipo === 'lembrete_pendente');",
+                  "console.log(`${lembretes.length} lembrete(s) de pedido parado`);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Encerrar sessão",
       "item": [
         {
           "name": "Logout do Bruno",
