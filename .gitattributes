@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+# Scripts shell executados dentro do Linux (container) precisam de LF.
+# Sem isso, um clone no Windows com autocrlf quebraria o entrypoint.
+*.sh text eol=lf
+
+/.github export-ignore
+CHANGELOG.md export-ignore
+.styleci.yml export-ignore
