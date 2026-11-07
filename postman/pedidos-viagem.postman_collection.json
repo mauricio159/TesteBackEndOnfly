@@ -1,0 +1,1483 @@
+{
+  "info": {
+    "name": "Pedidos de Viagem - API",
+    "description": "Coleção pronta para testar o microsserviço de pedidos de viagem corporativa.\n\n**Como usar**\n1. Suba o projeto com `docker compose up -d` e rode `docker compose exec app php artisan db:seed`.\n2. Importe este arquivo no Postman.\n3. Clique na coleção > **Run** para executar tudo em ordem, ou rode as requisições uma a uma de cima para baixo.\n\nOs tokens e o ID do pedido criado são guardados sozinhos nas variáveis da coleção (aba *Variables*), pelos scripts da aba *Scripts* de cada requisição.\n\nUsuários do seeder (senha `senha123`): admin@viagens.test (administradora), ana@viagens.test e bruno@viagens.test (colaboradores).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "description": "Endereço da API. Troque aqui se subir em outra porta."
+    },
+    {
+      "key": "token_admin",
+      "value": "",
+      "description": "Preenchido pelo login da administradora."
+    },
+    {
+      "key": "token_ana",
+      "value": "",
+      "description": "Preenchido pelo login da Ana."
+    },
+    {
+      "key": "token_bruno",
+      "value": "",
+      "description": "Preenchido pelo login do Bruno."
+    },
+    {
+      "key": "pedido_id",
+      "value": "",
+      "description": "ID do pedido criado em \"Criar pedido\"."
+    },
+    {
+      "key": "segundo_pedido_id",
+      "value": "",
+      "description": "ID do pedido usado no teste de cancelamento."
+    },
+    {
+      "key": "data_ida",
+      "value": "",
+      "description": "Calculada automaticamente (hoje + 30 dias)."
+    },
+    {
+      "key": "data_volta",
+      "value": "",
+      "description": "Calculada automaticamente (hoje + 35 dias)."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Script da COLEÇÃO: roda antes de TODA requisição.",
+          "// Calcula datas de viagem no futuro, porque a API recusa data de ida",
+          "// no passado. Assim a coleção funciona em qualquer dia em que for usada.",
+          "const formatar = (data) => data.toISOString().slice(0, 10); // AAAA-MM-DD",
+          "const daquiA = (dias) => { const d = new Date(); d.setDate(d.getDate() + dias); return formatar(d); };",
+          "",
+          "pm.collectionVariables.set('data_ida', daquiA(30));",
+          "pm.collectionVariables.set('data_volta', daquiA(35));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Script da COLEÇÃO: roda depois de TODA requisição.",
+          "// Toda resposta da API deve ser JSON (exceto o 204 do logout, que vem vazio).",
+          "if (pm.response.code !== 204) {",
+          "  pm.test('Resposta em JSON', () => pm.response.to.be.json);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticação",
+      "description": "Rode os três logins primeiro: eles guardam os tokens usados pelo resto da coleção.",
+      "item": [
+        {
+          "name": "Login - administradora (Carla)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Faz login como administradora e guarda o token na variável {{token_admin}}. As próximas requisições usam esse token automaticamente.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@viagens.test\",\n  \"senha\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Confere se o login deu certo...",
+                  "pm.test('Login realizado (200)', () => pm.response.to.have.status(200));",
+                  "",
+                  "// ...e guarda o token numa variável da coleção. É assim que as outras",
+                  "// requisições \"sabem\" quem está logado, sem você copiar e colar nada.",
+                  "const resposta = pm.response.json();",
+                  "pm.collectionVariables.set('token_admin', resposta.token);",
+                  "console.log('Token salvo em token_admin para', resposta.usuario.nome);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - colaboradora (Ana)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Faz login como colaboradora e guarda o token na variável {{token_ana}}. As próximas requisições usam esse token automaticamente.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ana@viagens.test\",\n  \"senha\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Confere se o login deu certo...",
+                  "pm.test('Login realizado (200)', () => pm.response.to.have.status(200));",
+                  "",
+                  "// ...e guarda o token numa variável da coleção. É assim que as outras",
+                  "// requisições \"sabem\" quem está logado, sem você copiar e colar nada.",
+                  "const resposta = pm.response.json();",
+                  "pm.collectionVariables.set('token_ana', resposta.token);",
+                  "console.log('Token salvo em token_ana para', resposta.usuario.nome);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - colaborador (Bruno)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Faz login como colaborador e guarda o token na variável {{token_bruno}}. As próximas requisições usam esse token automaticamente.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bruno@viagens.test\",\n  \"senha\": \"senha123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Confere se o login deu certo...",
+                  "pm.test('Login realizado (200)', () => pm.response.to.have.status(200));",
+                  "",
+                  "// ...e guarda o token numa variável da coleção. É assim que as outras",
+                  "// requisições \"sabem\" quem está logado, sem você copiar e colar nada.",
+                  "const resposta = pm.response.json();",
+                  "pm.collectionVariables.set('token_bruno', resposta.token);",
+                  "console.log('Token salvo em token_bruno para', resposta.usuario.nome);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar novo colaborador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/cadastro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "cadastro"
+              ]
+            },
+            "description": "Cria um usuário comum. Mesmo mandando \"administrador\": true, ele NÃO vira administrador.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Pessoa de Teste\",\n  \"email\": \"{{email_aleatorio}}\",\n  \"senha\": \"senha123\",\n  \"senha_confirmacao\": \"senha123\",\n  \"administrador\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Gera um e-mail diferente a cada execução, porque o e-mail precisa ser único.",
+                  "pm.variables.set('email_aleatorio', `teste.${Date.now()}@viagens.test`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Usuário criado (201)', () => pm.response.to.have.status(201));",
+                  "pm.test('Não virou administrador, mesmo pedindo', () => {",
+                  "  pm.expect(pm.response.json().usuario.administrador).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login com senha errada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "A API responde 401 com a mesma mensagem para e-mail inexistente e senha errada.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ana@viagens.test\",\n  \"senha\": \"senha-errada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recusado (401)', () => pm.response.to.have.status(401));",
+                  "pm.test('Mensagem genérica', () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('E-mail ou senha inválidos.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meu perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/perfil",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "perfil"
+              ]
+            },
+            "description": "Mostra quem é o dono do token enviado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Perfil da Ana (200)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.email).to.eql('ana@viagens.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Pedidos de viagem",
+      "description": "Criar, consultar e listar com filtros. Feito como a colaboradora Ana.",
+      "item": [
+        {
+          "name": "Criar pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ]
+            },
+            "description": "O nome do solicitante vem do token (Ana), e o status começa sempre como \"solicitado\".",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destino\": \"Lisboa, Portugal\",\n  \"data_ida\": \"{{data_ida}}\",\n  \"data_volta\": \"{{data_volta}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pedido criado (201)', () => pm.response.to.have.status(201));",
+                  "",
+                  "const pedido = pm.response.json().data;",
+                  "pm.test('Nasce como \"solicitado\" e em nome da Ana', () => {",
+                  "  pm.expect(pedido.status).to.eql('solicitado');",
+                  "  pm.expect(pedido.solicitante.nome).to.eql('Ana Souza');",
+                  "});",
+                  "",
+                  "// Guarda o ID para consultar, aprovar e cancelar nas próximas requisições.",
+                  "pm.collectionVariables.set('pedido_id', pedido.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar pedido com dados inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ]
+            },
+            "description": "Mostra as mensagens de validação: data no passado e volta antes da ida.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destino\": \"\",\n  \"data_ida\": \"2020-01-10\",\n  \"data_volta\": \"2020-01-05\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recusado (422)', () => pm.response.to.have.status(422));",
+                  "pm.test('Aponta os três campos com problema', () => {",
+                  "  const erros = pm.response.json().errors;",
+                  "  pm.expect(erros).to.have.keys('destino', 'data_ida', 'data_volta');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar pedido por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Encontrou o pedido criado (200)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('pedido_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar meus pedidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ]
+            },
+            "description": "Colaborador vê só os próprios pedidos; administrador vê todos.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Lista paginada (200)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.keys('data', 'links', 'meta');",
+                  "});",
+                  "pm.test('Todos os pedidos são da Ana', () => {",
+                  "  pm.response.json().data.forEach((p) => pm.expect(p.solicitante.nome).to.eql('Ana Souza'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?status=solicitado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "solicitado"
+                }
+              ]
+            },
+            "description": "Valores aceitos: solicitado, aprovado, cancelado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Só pedidos \"solicitado\"', () => {",
+                  "  pm.response.json().data.forEach((p) => pm.expect(p.status).to.eql('solicitado'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por destino",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?destino=lisboa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "destino",
+                  "value": "lisboa"
+                }
+              ]
+            },
+            "description": "Busca parcial e sem diferenciar maiúsculas: \"lisboa\" encontra \"Lisboa, Portugal\".",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Todos os destinos contêm \"lisboa\"', () => {",
+                  "  pm.response.json().data.forEach((p) => pm.expect(p.destino.toLowerCase()).to.include('lisboa'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por período da viagem",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?viagem_de={{data_ida}}&viagem_ate={{data_volta}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "viagem_de",
+                  "value": "{{data_ida}}"
+                },
+                {
+                  "key": "viagem_ate",
+                  "value": "{{data_volta}}"
+                }
+              ]
+            },
+            "description": "Traz viagens que acontecem INTEIRAS dentro do período (ida >= viagem_de e volta <= viagem_ate).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Encontrou o pedido criado', () => {",
+                  "  const ids = pm.response.json().data.map((p) => p.id);",
+                  "  pm.expect(ids).to.include(pm.collectionVariables.get('pedido_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por período de criação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?criado_de={{hoje}}&criado_ate={{hoje}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "criado_de",
+                  "value": "{{hoje}}"
+                },
+                {
+                  "key": "criado_ate",
+                  "value": "{{hoje}}"
+                }
+              ]
+            },
+            "description": "Pedidos feitos entre criado_de e criado_ate. Aqui: pedidos feitos hoje.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Data de hoje no formato que a API espera (AAAA-MM-DD).",
+                  "pm.variables.set('hoje', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtros combinados com paginação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?status=solicitado&destino=lisboa&por_pagina=5&pagina=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "solicitado"
+                },
+                {
+                  "key": "destino",
+                  "value": "lisboa"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "5"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Todos os filtros podem ser combinados. por_pagina vai de 1 a 100 (padrão 15).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respeita o tamanho da página', () => {",
+                  "  pm.expect(pm.response.json().meta.per_page).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtro inválido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem?status=pendente",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pendente"
+                }
+              ]
+            },
+            "description": "Filtro errado gera 422 em vez de ser ignorado em silêncio.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recusado (422)', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Aprovação e cancelamento",
+      "description": "As regras de negócio do desafio: só administrador decide, e pedido aprovado não pode ser cancelado.",
+      "item": [
+        {
+          "name": "Ana tenta aprovar o próprio pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_id}}",
+                "status"
+              ]
+            },
+            "description": "O solicitante não pode alterar o status do próprio pedido.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"aprovado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Proibido (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bruno tenta ver o pedido da Ana",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_bruno}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Proibido (403)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Administradora aprova o pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_id}}",
+                "status"
+              ]
+            },
+            "description": "Aprova e dispara a notificação para a Ana (e-mail no Mailpit + GET /notificacoes).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"aprovado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Aprovado (200)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.status).to.eql('aprovado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tentar cancelar pedido já aprovado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{pedido_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{pedido_id}}",
+                "status"
+              ]
+            },
+            "description": "Regra do desafio: só é possível cancelar se o pedido ainda não foi aprovado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Recusado pela regra de negócio (422)', () => pm.response.to.have.status(422));",
+                  "pm.test('Explica o motivo', () => {",
+                  "  const resposta = pm.response.json();",
+                  "  pm.expect(resposta.status_atual).to.eql('aprovado');",
+                  "  pm.expect(resposta.status_solicitado).to.eql('cancelado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ana cria um segundo pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destino\": \"Recife, PE\",\n  \"data_ida\": \"{{data_ida}}\",\n  \"data_volta\": \"{{data_volta}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pedido criado (201)', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('segundo_pedido_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Administradora cancela o segundo pedido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos-viagem/{{segundo_pedido_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos-viagem",
+                "{{segundo_pedido_id}}",
+                "status"
+              ]
+            },
+            "description": "Pedido ainda \"solicitado\" pode ser cancelado. A Ana também é notificada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cancelado (200)', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.status).to.eql('cancelado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Notificações",
+      "item": [
+        {
+          "name": "Notificações da Ana",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notificacoes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notificacoes"
+              ]
+            },
+            "description": "Avisos de aprovação/cancelamento. Os mesmos avisos aparecem por e-mail em http://localhost:8025.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_ana}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A notificação é enviada pela fila (container \"queue\"). Esperamos",
+                  "// 2 segundos para dar tempo de o worker processar.",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Tem notificação do pedido aprovado', () => {",
+                  "  const ids = pm.response.json().data.map((n) => n.dados.pedido_id);",
+                  "  pm.expect(ids).to.include(pm.collectionVariables.get('pedido_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Encerrar sessão",
+      "item": [
+        {
+          "name": "Logout do Bruno",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revoga o token usado. Depois disso, ele não funciona mais.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_bruno}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sessão encerrada (204)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usar token depois do logout",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/perfil",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "perfil"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_bruno}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Token não vale mais (401)', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
